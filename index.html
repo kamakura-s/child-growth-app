@@ -6,7 +6,7 @@
   <title>すくすくノート | 子どもの成長記録</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body data-theme="light">
   <div class="bg-decor" aria-hidden="true"></div>
 
   <header class="container hero">
@@ -123,11 +123,15 @@
 
         <div class="settings-block">
           <h3>表示</h3>
+          <label class="toggle-label" for="themeToggle">
+            <input id="themeToggle" type="checkbox" />
+            ダークモード（ONでダーク / OFFでライト）
+          </label>
           <label class="toggle-label" for="largeTextToggle">
             <input id="largeTextToggle" type="checkbox" />
             大きめ文字モード
           </label>
-          <p class="muted">文字サイズを少し大きくして見やすくします（保存されます）。</p>
+          <p class="muted">表示設定は保存され、次回起動時にも反映されます。</p>
         </div>
 
         <div class="settings-block">

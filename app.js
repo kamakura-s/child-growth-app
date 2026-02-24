@@ -11,6 +11,7 @@ const state = {
   ui: {
     continuousGrowthInput: false,
     largeText: false,
+    theme: "light",
   },
 };
 
@@ -57,6 +58,7 @@ const els = {
   settingsError: $("settingsError"),
   clearAll: $("clearAll"),
   largeTextToggle: $("largeTextToggle"),
+  themeToggle: $("themeToggle"),
 
   growthTpl: $("growthItemTpl"),
   diaryTpl: $("diaryItemTpl"),
@@ -132,6 +134,7 @@ function applyData(parsed) {
   state.ui = {
     continuousGrowthInput: Boolean(ui.continuousGrowthInput),
     largeText: Boolean(ui.largeText),
+    theme: ui.theme === "dark" ? "dark" : "light",
   };
 }
 
@@ -300,9 +303,14 @@ function drawChart() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
+  const css = getComputedStyle(document.body);
+  const mutedColor = css.getPropertyValue("--muted").trim() || "#6b7280";
+  const borderColor = css.getPropertyValue("--border").trim() || "#e5e7eb";
+  const textColor = css.getPropertyValue("--text").trim() || "#111827";
+
   const data = [...state.growthRecords].sort((a, b) => a.date.localeCompare(b.date));
   if (!data.length) {
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = mutedColor;
     ctx.font = "16px sans-serif";
     ctx.fillText("記録が追加されるとグラフが表示されます", 20, 40);
     return;
@@ -319,7 +327,7 @@ function drawChart() {
   const maxV = Math.max(...allVals);
   const range = Math.max(maxV - minV, 1);
 
-  ctx.strokeStyle = "#e5e7eb";
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (plotH * i) / 4;
@@ -329,7 +337,7 @@ function drawChart() {
     ctx.stroke();
 
     const val = (maxV - (range * i) / 4).toFixed(1);
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = mutedColor;
     ctx.font = "12px sans-serif";
     ctx.fillText(val, 6, y + 4);
   }
@@ -364,22 +372,28 @@ function drawChart() {
 
   ctx.fillStyle = "#4f46e5";
   ctx.fillRect(w - 180, 10, 14, 4);
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = textColor;
   ctx.font = "12px sans-serif";
   ctx.fillText("身長", w - 160, 16);
 
   ctx.fillStyle = "#059669";
   ctx.fillRect(w - 100, 10, 14, 4);
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = textColor;
   ctx.fillText("体重", w - 80, 16);
 
-  ctx.fillStyle = "#6b7280";
+  ctx.fillStyle = mutedColor;
   ctx.font = "11px sans-serif";
   data.forEach((d, i) => {
     const x = xFor(i);
     const label = d.date.slice(5);
     ctx.fillText(label, x - 16, h - 14);
   });
+}
+
+function applyTheme() {
+  const theme = state.ui.theme === "dark" ? "dark" : "light";
+  document.body.dataset.theme = theme;
+  if (els.themeToggle) els.themeToggle.checked = theme === "dark";
 }
 
 function renderAll() {
@@ -390,6 +404,7 @@ function renderAll() {
   els.continuousGrowthMode.checked = state.ui.continuousGrowthInput;
   if (els.largeTextToggle) els.largeTextToggle.checked = state.ui.largeText;
   document.body.classList.toggle("large-text", state.ui.largeText);
+  applyTheme();
 }
 
 function fileToDataUrl(file) {
@@ -589,6 +604,14 @@ function setupEvents() {
     els.largeTextToggle.addEventListener("change", () => {
       state.ui.largeText = els.largeTextToggle.checked;
       document.body.classList.toggle("large-text", state.ui.largeText);
+      save();
+    });
+  }
+
+  if (els.themeToggle) {
+    els.themeToggle.addEventListener("change", () => {
+      state.ui.theme = els.themeToggle.checked ? "dark" : "light";
+      applyTheme();
       save();
     });
   }

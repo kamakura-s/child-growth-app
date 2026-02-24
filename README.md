@@ -8,6 +8,7 @@
 - **SPAタブUI**（プロフィール / 成長記録 / 日記 / グラフ / 設定）
 - 初回オンボーディング（3ステップ、初回のみ表示）
 - 保存ステータス表示（保存中 / 保存済み / エラー）
+- 表示テーマ切替（ライト / ダーク、設定で保存）
 - 子どもプロフィール登録（名前・生年月日・メモ）
 - 身長 / 体重の記録（日時・メモ）
 - **連続入力モード**（成長記録フォーム保存後にリセットしない）
@@ -38,7 +39,9 @@
     { "id": "...", "date": "YYYY-MM-DD", "title": "...", "text": "...", "photoDataUrl": "data:image/..." }
   ],
   "ui": {
-    "continuousGrowthInput": false
+    "continuousGrowthInput": false,
+    "largeText": false,
+    "theme": "light"
   }
 }
 ```
