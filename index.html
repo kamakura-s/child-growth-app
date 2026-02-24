@@ -73,8 +73,18 @@
           <label>体重 (kg) <span class="req">*</span>
             <input type="number" id="weight" min="1" max="120" step="0.1" required placeholder="例: 13.6" />
           </label>
+          <fieldset class="choice-group">
+            <legend>体調</legend>
+            <div id="growthConditionChoices" class="choice-options" role="radiogroup" aria-label="体調選択">
+              <label><input type="radio" name="growthCondition" value="good" checked /> 元気</label>
+              <label><input type="radio" name="growthCondition" value="normal" /> ふつう</label>
+              <label><input type="radio" name="growthCondition" value="tired" /> つかれ気味</label>
+              <label><input type="radio" name="growthCondition" value="sick" /> 体調不良</label>
+            </div>
+          </fieldset>
           <label>タグ（カンマ区切り）
             <input type="text" id="growthTags" maxlength="120" placeholder="例: 発熱,病院" />
+            <div id="growthTagSuggestions" class="tag-suggestions" aria-label="タグ候補"></div>
           </label>
           <label>メモ
             <input type="text" id="growthMemo" maxlength="80" placeholder="体調や出来事" />
@@ -146,6 +156,7 @@
           </label>
           <label>タグ（カンマ区切り）
             <input type="text" id="diaryTags" maxlength="120" placeholder="例: 公園,友だち" />
+            <div id="diaryTagSuggestions" class="tag-suggestions" aria-label="タグ候補"></div>
           </label>
           <label>内容 <span class="req">*</span>
             <textarea id="diaryText" rows="3" required maxlength="300"></textarea>
@@ -198,8 +209,30 @@
     <section id="tab-graph" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-graph">
       <article class="card">
         <h2>成長グラフ（身長 / 体重）</h2>
+        <p class="muted">実線: 実測値 / 点線: 3件移動平均</p>
         <canvas id="growthChart" width="900" height="320" aria-label="成長グラフ"></canvas>
-        <small>※簡易グラフです。データが2件以上あると線が表示されます。</small>
+        <div class="graph-legend">
+          <span><i class="legend-line height"></i> 身長実測</span>
+          <span><i class="legend-line height avg"></i> 身長移動平均</span>
+          <span><i class="legend-line weight"></i> 体重実測</span>
+          <span><i class="legend-line weight avg"></i> 体重移動平均</span>
+        </div>
+      </article>
+
+      <article class="card card-grid-two">
+        <section>
+          <h3>月別記録件数</h3>
+          <canvas id="monthlyCountChart" width="440" height="240" aria-label="月別記録件数"></canvas>
+        </section>
+        <section>
+          <h3>カテゴリ比率</h3>
+          <canvas id="categoryRatioChart" width="440" height="240" aria-label="カテゴリ比率"></canvas>
+        </section>
+      </article>
+
+      <article class="card">
+        <h2>分析カード</h2>
+        <div id="analysisCards" class="analysis-grid"></div>
       </article>
 
       <article class="card">

@@ -1,7 +1,19 @@
 const STORAGE_KEY = "childGrowthMvpData";
 const ONBOARDING_SEEN_KEY = "childGrowthOnboardingSeen";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const MAX_IMAGE_MB = 2;
+
+const CONDITION_LABELS = {
+  good: "元気",
+  normal: "ふつう",
+  tired: "つかれ気味",
+  sick: "体調不良",
+};
+
+const TAG_SUGGESTIONS = {
+  growth: ["発熱", "病院", "食欲", "お昼寝", "予防接種", "検診"],
+  diary: ["公園", "友だち", "家族", "おでかけ", "誕生日", "習いごと"],
+};
 
 const CATEGORY_LABELS = {
   health: "健康",
@@ -52,6 +64,8 @@ const els = {
   weight: $("weight"),
   growthTags: $("growthTags"),
   growthMemo: $("growthMemo"),
+  growthConditionChoices: $("growthConditionChoices"),
+  growthTagSuggestions: $("growthTagSuggestions"),
   continuousGrowthMode: $("continuousGrowthMode"),
   growthList: $("growthList"),
   growthError: $("growthError"),
@@ -68,6 +82,7 @@ const els = {
   diaryTitle: $("diaryTitle"),
   diaryCategory: $("diaryCategory"),
   diaryTags: $("diaryTags"),
+  diaryTagSuggestions: $("diaryTagSuggestions"),
   diaryText: $("diaryText"),
   diaryPhoto: $("diaryPhoto"),
   diaryList: $("diaryList"),
@@ -81,6 +96,9 @@ const els = {
   diaryFilterTag: $("diaryFilterTag"),
 
   chart: $("growthChart"),
+  monthlyCountChart: $("monthlyCountChart"),
+  categoryRatioChart: $("categoryRatioChart"),
+  analysisCards: $("analysisCards"),
   reportMonth: $("reportMonth"),
   monthlyReport: $("monthlyReport"),
 
@@ -123,6 +141,21 @@ function toTags(input) {
 
 function normalizeCategory(value, fallback = "other") {
   return CATEGORY_LABELS[value] ? value : fallback;
+}
+
+function normalizeCondition(value) {
+  return CONDITION_LABELS[value] ? value : "normal";
+}
+
+function getGrowthConditionValue() {
+  const selected = document.querySelector('input[name="growthCondition"]:checked');
+  return normalizeCondition(selected?.value);
+}
+
+function setGrowthConditionValue(value = "normal") {
+  const v = normalizeCondition(value);
+  const target = document.querySelector(`input[name="growthCondition"][value="${v}"]`);
+  if (target) target.checked = true;
 }
 
 function setAppError(msg = "") {
@@ -180,6 +213,7 @@ function migrateGrowthRecord(rec) {
     weight: Number(rec.weight),
     memo: rec.memo || "",
     category: normalizeCategory(rec.category, "health"),
+    condition: normalizeCondition(rec.condition),
     tags: Array.isArray(rec.tags) ? toTags(rec.tags.join(",")) : [],
   };
 }
@@ -342,7 +376,8 @@ function renderGrowthList() {
   for (const rec of sorted) {
     const node = els.growthTpl.content.firstElementChild.cloneNode(true);
     node.querySelector(".date").textContent = formatDate(rec.date);
-    node.querySelector(".meta").textContent = `身長 ${rec.height} cm / 体重 ${rec.weight} kg${rec.memo ? ` / ${rec.memo}` : ""}`;
+    const cond = CONDITION_LABELS[rec.condition] || CONDITION_LABELS.normal;
+    node.querySelector(".meta").textContent = `身長 ${rec.height} cm / 体重 ${rec.weight} kg / 体調 ${cond}${rec.memo ? ` / ${rec.memo}` : ""}`;
     node.querySelector(".chips").innerHTML = chipsHtml(rec.category, rec.tags);
     node.querySelector(".delete-growth").addEventListener("click", () => {
       if (!confirm("この記録を削除しますか？")) return;
@@ -384,6 +419,15 @@ function renderDiaryList() {
   }
 }
 
+function movingAverage(values, window = 3) {
+  return values.map((_, i) => {
+    const start = Math.max(0, i - (window - 1));
+    const subset = values.slice(start, i + 1).filter(Number.isFinite);
+    if (!subset.length) return null;
+    return subset.reduce((s, v) => s + v, 0) / subset.length;
+  });
+}
+
 function drawChart() {
   const canvas = els.chart;
   const ctx = canvas.getContext("2d");
@@ -394,7 +438,6 @@ function drawChart() {
   const css = getComputedStyle(document.body);
   const mutedColor = css.getPropertyValue("--muted").trim() || "#6b7280";
   const borderColor = css.getPropertyValue("--border").trim() || "#e5e7eb";
-  const textColor = css.getPropertyValue("--text").trim() || "#111827";
 
   const data = [...state.growthRecords].sort((a, b) => a.date.localeCompare(b.date));
   if (!data.length) {
@@ -410,6 +453,8 @@ function drawChart() {
 
   const heights = data.map((d) => Number(d.height));
   const weights = data.map((d) => Number(d.weight));
+  const hAvg = movingAverage(heights, 3);
+  const wAvg = movingAverage(weights, 3);
   const allVals = [...heights, ...weights].filter(Number.isFinite);
   const minV = Math.min(...allVals);
   const maxV = Math.max(...allVals);
@@ -423,7 +468,6 @@ function drawChart() {
     ctx.moveTo(pad.left, y);
     ctx.lineTo(w - pad.right, y);
     ctx.stroke();
-
     const val = (maxV - (range * i) / 4).toFixed(1);
     ctx.fillStyle = mutedColor;
     ctx.font = "12px sans-serif";
@@ -433,20 +477,25 @@ function drawChart() {
   const xFor = (idx) => pad.left + (data.length === 1 ? plotW / 2 : (plotW * idx) / (data.length - 1));
   const yFor = (val) => pad.top + ((maxV - val) / range) * plotH;
 
-  function drawSeries(values, color) {
+  function drawSeries(values, color, dashed = false, points = true) {
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = 2;
+    ctx.setLineDash(dashed ? [6, 4] : []);
     ctx.beginPath();
     values.forEach((v, i) => {
+      if (!Number.isFinite(v)) return;
       const x = xFor(i);
       const y = yFor(v);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
     if (values.length >= 2) ctx.stroke();
+    ctx.setLineDash([]);
 
+    if (!points) return;
     values.forEach((v, i) => {
+      if (!Number.isFinite(v)) return;
       const x = xFor(i);
       const y = yFor(v);
       ctx.beginPath();
@@ -455,27 +504,149 @@ function drawChart() {
     });
   }
 
-  drawSeries(heights, "#4f46e5");
-  drawSeries(weights, "#059669");
-
-  ctx.fillStyle = "#4f46e5";
-  ctx.fillRect(w - 180, 10, 14, 4);
-  ctx.fillStyle = textColor;
-  ctx.font = "12px sans-serif";
-  ctx.fillText("身長", w - 160, 16);
-
-  ctx.fillStyle = "#059669";
-  ctx.fillRect(w - 100, 10, 14, 4);
-  ctx.fillStyle = textColor;
-  ctx.fillText("体重", w - 80, 16);
+  drawSeries(heights, "#4f46e5", false, true);
+  drawSeries(hAvg, "#4f46e5", true, false);
+  drawSeries(weights, "#059669", false, true);
+  drawSeries(wAvg, "#059669", true, false);
 
   ctx.fillStyle = mutedColor;
   ctx.font = "11px sans-serif";
   data.forEach((d, i) => {
     const x = xFor(i);
-    const label = d.date.slice(5);
-    ctx.fillText(label, x - 16, h - 14);
+    ctx.fillText(d.date.slice(5), x - 16, h - 14);
   });
+}
+
+function drawMonthlyCountChart() {
+  const canvas = els.monthlyCountChart;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const css = getComputedStyle(document.body);
+  const mutedColor = css.getPropertyValue("--muted").trim() || "#6b7280";
+  const borderColor = css.getPropertyValue("--border").trim() || "#e5e7eb";
+
+  const monthMap = new Map();
+  state.growthRecords.forEach((r) => {
+    const key = r.date.slice(0, 7);
+    if (!key) return;
+    monthMap.set(key, (monthMap.get(key) || 0) + 1);
+  });
+  const items = [...monthMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-6);
+  if (!items.length) {
+    ctx.fillStyle = mutedColor;
+    ctx.font = "14px sans-serif";
+    ctx.fillText("記録が追加されると表示されます", 14, 28);
+    return;
+  }
+
+  const max = Math.max(...items.map(([, c]) => c), 1);
+  const pad = { left: 28, right: 8, top: 12, bottom: 30 };
+  const barW = (w - pad.left - pad.right) / items.length - 8;
+  items.forEach(([month, count], i) => {
+    const x = pad.left + i * (barW + 8);
+    const bh = ((h - pad.top - pad.bottom) * count) / max;
+    const y = h - pad.bottom - bh;
+    ctx.fillStyle = "#6366f1";
+    ctx.fillRect(x, y, barW, bh);
+    ctx.fillStyle = mutedColor;
+    ctx.font = "11px sans-serif";
+    ctx.fillText(String(count), x + 4, y - 4);
+    ctx.fillText(month.slice(5), x + 2, h - 10);
+  });
+  ctx.strokeStyle = borderColor;
+  ctx.strokeRect(pad.left - 2, pad.top - 2, w - pad.left - pad.right + 4, h - pad.top - pad.bottom + 4);
+}
+
+function drawCategoryRatioChart() {
+  const canvas = els.categoryRatioChart;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const css = getComputedStyle(document.body);
+  const mutedColor = css.getPropertyValue("--muted").trim() || "#6b7280";
+  const cats = {};
+  state.growthRecords.forEach((r) => {
+    cats[r.category] = (cats[r.category] || 0) + 1;
+  });
+  const entries = Object.entries(cats);
+  if (!entries.length) {
+    ctx.fillStyle = mutedColor;
+    ctx.font = "14px sans-serif";
+    ctx.fillText("カテゴリ記録があると表示されます", 14, 28);
+    return;
+  }
+
+  const colors = ["#4f46e5", "#059669", "#f59e0b", "#3b82f6", "#ef4444", "#8b5cf6"];
+  const total = entries.reduce((s, [, c]) => s + c, 0);
+  const cx = 90;
+  const cy = h / 2;
+  const r = 62;
+  let start = -Math.PI / 2;
+  entries.forEach(([cat, count], i) => {
+    const angle = (count / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, start + angle);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    start += angle;
+  });
+
+  entries.forEach(([cat, count], i) => {
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(180, 24 + i * 28, 12, 12);
+    ctx.fillStyle = mutedColor;
+    const pct = ((count / total) * 100).toFixed(0);
+    ctx.fillText(`${CATEGORY_LABELS[cat] || cat} ${pct}%`, 198, 34 + i * 28);
+  });
+}
+
+function renderAnalysisCards() {
+  if (!els.analysisCards) return;
+  const data = [...state.growthRecords].sort((a, b) => a.date.localeCompare(b.date));
+  if (!data.length) {
+    els.analysisCards.innerHTML = "<p class='muted'>記録を追加すると分析が表示されます。</p>";
+    return;
+  }
+
+  const latest = data[data.length - 1];
+  const first = data[0];
+  const diffHeight = (latest.height - first.height).toFixed(1);
+  const diffWeight = (latest.weight - first.weight).toFixed(1);
+
+  const avgDh = data.length > 1 ? ((latest.height - first.height) / (data.length - 1)).toFixed(2) : "0.00";
+  const avgDw = data.length > 1 ? ((latest.weight - first.weight) / (data.length - 1)).toFixed(2) : "0.00";
+
+  const recent = data.slice(-3);
+  const trendH = recent.length >= 2 ? recent[recent.length - 1].height - recent[0].height : 0;
+  const trendW = recent.length >= 2 ? recent[recent.length - 1].weight - recent[0].weight : 0;
+  const trendText = `${trendH >= 0 ? "↗" : "↘"} 身長 ${trendH.toFixed(1)}cm / ${trendW >= 0 ? "↗" : "↘"} 体重 ${trendW.toFixed(1)}kg`;
+
+  const month = els.reportMonth.value;
+  let monthDiff = "データ不足";
+  if (month) {
+    const monthRows = data.filter((r) => r.date.startsWith(month));
+    if (monthRows.length >= 2) {
+      const mDiffH = (monthRows[monthRows.length - 1].height - monthRows[0].height).toFixed(1);
+      const mDiffW = (monthRows[monthRows.length - 1].weight - monthRows[0].weight).toFixed(1);
+      monthDiff = `身長 ${mDiffH >= 0 ? "+" : ""}${mDiffH}cm / 体重 ${mDiffW >= 0 ? "+" : ""}${mDiffW}kg`;
+    }
+  }
+
+  els.analysisCards.innerHTML = `
+    <article class="analysis-card"><div class="label">月次増減</div><div class="value">${monthDiff}</div></article>
+    <article class="analysis-card"><div class="label">平均変化（1記録あたり）</div><div class="value">身長 ${avgDh}cm / 体重 ${avgDw}kg</div></article>
+    <article class="analysis-card"><div class="label">直近トレンド（最新3件）</div><div class="value">${trendText}</div></article>
+    <article class="analysis-card"><div class="label">累積増減（初回→最新）</div><div class="value">身長 ${diffHeight}cm / 体重 ${diffWeight}kg</div></article>
+  `;
 }
 
 function renderMonthlyReport() {
@@ -530,6 +701,9 @@ function renderAll() {
   renderGrowthList();
   renderDiaryList();
   drawChart();
+  drawMonthlyCountChart();
+  drawCategoryRatioChart();
+  renderAnalysisCards();
   renderMonthlyReport();
   els.continuousGrowthMode.checked = state.ui.continuousGrowthInput;
   if (els.largeTextToggle) els.largeTextToggle.checked = state.ui.largeText;
@@ -704,6 +878,22 @@ function setupFilterEvents() {
   });
 }
 
+function appendTag(inputEl, tag) {
+  const current = toTags(inputEl.value);
+  const merged = [...new Set([...current, tag.toLowerCase()])];
+  inputEl.value = merged.join(",");
+}
+
+function setupTagSuggestions(container, inputEl, tags) {
+  if (!container || !inputEl) return;
+  container.innerHTML = tags.map((tag) => `<button type="button" class="tag-chip" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join("");
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".tag-chip");
+    if (!btn) return;
+    appendTag(inputEl, btn.dataset.tag || "");
+  });
+}
+
 function setupEvents() {
   els.tabButtons.forEach((btn, idx) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -753,6 +943,7 @@ function setupEvents() {
       id: uid(),
       date: els.recordDate.value,
       category: normalizeCategory(els.growthCategory.value, "health"),
+      condition: getGrowthConditionValue(),
       height: Number(els.height.value),
       weight: Number(els.weight.value),
       tags: toTags(els.growthTags.value),
@@ -765,6 +956,7 @@ function setupEvents() {
       els.recordDate.valueAsDate = new Date();
       els.continuousGrowthMode.checked = false;
       els.growthCategory.value = "health";
+      setGrowthConditionValue("good");
     }
 
     renderAll();
@@ -857,8 +1049,14 @@ function setupEvents() {
   });
 
   if (els.reportMonth) {
-    els.reportMonth.addEventListener("input", renderMonthlyReport);
+    els.reportMonth.addEventListener("input", () => {
+      renderMonthlyReport();
+      renderAnalysisCards();
+    });
   }
+
+  setupTagSuggestions(els.growthTagSuggestions, els.growthTags, TAG_SUGGESTIONS.growth);
+  setupTagSuggestions(els.diaryTagSuggestions, els.diaryTags, TAG_SUGGESTIONS.diary);
 
   els.onboardingPrev.addEventListener("click", () => {
     onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
@@ -880,6 +1078,7 @@ function initDefaults() {
   els.recordDate.valueAsDate = today;
   els.diaryDate.valueAsDate = today;
   if (els.growthCategory) els.growthCategory.value = "health";
+  setGrowthConditionValue("good");
   if (els.diaryCategory) els.diaryCategory.value = "event";
   if (els.reportMonth) {
     els.reportMonth.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;

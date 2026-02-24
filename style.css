@@ -274,6 +274,48 @@ button.small { padding: 7px 10px; font-size: .85rem; min-height: auto; }
   color: var(--secondary-text);
 }
 
+.choice-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0;
+  padding: 10px;
+}
+
+.choice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--input-bg);
+}
+
+.choice-options input { margin: 0; }
+
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip {
+  border: 1px solid var(--tab-border);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--secondary-bg);
+  color: var(--secondary-text);
+  font-size: .8rem;
+}
+
+.tag-chip:hover { filter: brightness(1.03); }
+
 .category-chip {
   background: rgba(79, 70, 229, .12);
   border-color: rgba(79, 70, 229, .35);
@@ -301,6 +343,57 @@ canvas {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--input-bg);
+}
+
+.graph-legend {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.legend-line.avg { border-top-style: dashed; }
+.legend-line.height { border-color: #4f46e5; }
+.legend-line.weight { border-color: #059669; }
+
+.card-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analysis-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--input-bg);
+}
+
+.analysis-card .label {
+  color: var(--muted);
+  font-size: .84rem;
+}
+
+.analysis-card .value {
+  margin-top: 6px;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .settings-block + .settings-block { margin-top: 18px; }
@@ -436,6 +529,8 @@ canvas {
   .hero { display: block; }
   .form.two-col { grid-template-columns: 1fr; }
   .data-cards { grid-template-columns: 1fr; }
+  .card-grid-two { grid-template-columns: 1fr; }
+  .analysis-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
