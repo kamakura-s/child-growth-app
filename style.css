@@ -258,6 +258,7 @@ canvas {
   place-items: center;
   padding: 16px;
 }
+.onboarding-overlay[hidden] { display: none !important; }
 .onboarding-card {
   width: min(560px, 94vw);
   background: #fff;

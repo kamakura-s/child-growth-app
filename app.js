@@ -501,14 +501,20 @@ function renderOnboardingStep() {
 function closeOnboarding() {
   localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
   els.onboardingModal.hidden = true;
+  els.onboardingModal.style.display = "none";
 }
 
 function maybeShowOnboarding() {
   const seen = localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
-  if (seen) return;
+  if (seen) {
+    els.onboardingModal.hidden = true;
+    els.onboardingModal.style.display = "none";
+    return;
+  }
   onboardingStepIndex = 0;
   renderOnboardingStep();
   els.onboardingModal.hidden = false;
+  els.onboardingModal.style.display = "grid";
 }
 
 function setupEvents() {
