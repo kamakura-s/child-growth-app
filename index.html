@@ -45,7 +45,7 @@
             <textarea id="profileNote" rows="2" maxlength="120" placeholder="好きな食べ物など"></textarea>
           </label>
           <p class="error" id="profileError"></p>
-          <button type="submit">プロフィールを保存</button>
+          <button type="submit" class="btn btn-primary">プロフィールを保存</button>
         </form>
         <div id="profileView" class="profile-view"></div>
       </article>
@@ -72,7 +72,7 @@
             連続入力モード（保存後にフォームをリセットしない）
           </label>
           <p class="error full" id="growthError"></p>
-          <button type="submit" class="full">記録を追加</button>
+          <button type="submit" class="full btn btn-primary">記録を追加</button>
         </form>
       </article>
 
@@ -99,7 +99,7 @@
             <input type="file" id="diaryPhoto" accept="image/png,image/jpeg,image/webp" />
           </label>
           <p class="error" id="diaryError"></p>
-          <button type="submit">日記を保存</button>
+          <button type="submit" class="btn btn-primary">日記を保存</button>
         </form>
       </article>
 
@@ -133,21 +133,35 @@
         <div class="settings-block">
           <h3>データ管理</h3>
           <p class="muted">データには schemaVersion が付与されます。バックアップとしてJSONを保存できます。</p>
-          <div class="settings-actions">
-            <button id="exportJson" type="button">JSONエクスポート</button>
-            <label class="import-label">
-              JSONインポート
-              <input id="importJsonFile" type="file" accept="application/json,.json" />
-            </label>
+
+          <div class="data-cards">
+            <section class="data-card export-card" aria-label="エクスポート">
+              <h4>📤 エクスポート</h4>
+              <p class="muted">現在のプロフィール・記録・日記をJSONファイルとして保存します。</p>
+              <button id="exportJson" type="button" class="btn btn-primary">JSONエクスポート</button>
+            </section>
+
+            <section class="data-card import-card" aria-label="インポート">
+              <h4>📥 インポート</h4>
+              <p class="muted">バックアップJSONを読み込み、データを復元します。</p>
+              <div class="settings-actions">
+                <label class="import-label btn btn-secondary">
+                  ファイルからインポート
+                  <input id="importJsonFile" type="file" accept="application/json,.json" />
+                </label>
+              </div>
+              <textarea id="importJsonText" rows="6" placeholder="ここにJSONを貼り付けて、下のボタンから復元できます"></textarea>
+              <button id="importJsonTextBtn" type="button" class="btn btn-secondary">テキストからインポート</button>
+            </section>
           </div>
-          <textarea id="importJsonText" rows="8" placeholder="ここにJSONを貼り付けて [テキストからインポート] でも復元できます"></textarea>
-          <button id="importJsonTextBtn" type="button">テキストからインポート</button>
+
           <p class="error" id="settingsError"></p>
         </div>
 
-        <div class="settings-block">
+        <div class="settings-block danger-zone">
           <h3>危険操作</h3>
-          <button id="clearAll" class="danger" type="button">全データ削除</button>
+          <p class="muted">すべてのデータを削除します。元に戻せません。</p>
+          <button id="clearAll" class="btn btn-danger" type="button">全データ削除</button>
         </div>
       </article>
     </section>
@@ -159,7 +173,7 @@
         <strong class="date"></strong>
         <p class="meta"></p>
       </div>
-      <button class="danger small delete-growth" type="button">削除</button>
+      <button class="btn btn-danger small delete-growth" type="button">削除</button>
     </article>
   </template>
 
@@ -171,7 +185,7 @@
         <p class="text"></p>
         <img class="photo" alt="日記写真" />
       </div>
-      <button class="danger small delete-diary" type="button">削除</button>
+      <button class="btn btn-danger small delete-diary" type="button">削除</button>
     </article>
   </template>
 
@@ -192,9 +206,9 @@
         <p>写真付き日記も保存可能。設定タブからJSONバックアップができます。</p>
       </div>
       <div class="onboarding-actions">
-        <button type="button" id="onboardingPrev" class="ghost">戻る</button>
-        <button type="button" id="onboardingNext">次へ</button>
-        <button type="button" id="onboardingClose" class="ok">はじめる</button>
+        <button type="button" id="onboardingPrev" class="btn btn-secondary">戻る</button>
+        <button type="button" id="onboardingNext" class="btn btn-primary">次へ</button>
+        <button type="button" id="onboardingClose" class="btn btn-primary">はじめる</button>
       </div>
     </div>
   </div>
