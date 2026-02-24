@@ -1,15 +1,29 @@
 const STORAGE_KEY = "childGrowthMvpData";
+const ONBOARDING_SEEN_KEY = "childGrowthOnboardingSeen";
+const SCHEMA_VERSION = 1;
 const MAX_IMAGE_MB = 2;
 
 const state = {
+  schemaVersion: SCHEMA_VERSION,
   profile: null,
   growthRecords: [],
   diaries: [],
+  ui: {
+    continuousGrowthInput: false,
+    largeText: false,
+  },
 };
 
 const $ = (id) => document.getElementById(id);
 
 const els = {
+  appError: $("appError"),
+  saveStatus: $("saveStatus"),
+  srAnnouncer: $("srAnnouncer"),
+
+  tabButtons: Array.from(document.querySelectorAll(".tab-btn")),
+  tabPanels: Array.from(document.querySelectorAll(".tab-panel")),
+
   profileForm: $("profileForm"),
   childName: $("childName"),
   birthDate: $("birthDate"),
@@ -22,6 +36,7 @@ const els = {
   height: $("height"),
   weight: $("weight"),
   growthMemo: $("growthMemo"),
+  continuousGrowthMode: $("continuousGrowthMode"),
   growthList: $("growthList"),
   growthError: $("growthError"),
 
@@ -34,30 +49,101 @@ const els = {
   diaryError: $("diaryError"),
 
   chart: $("growthChart"),
+
+  exportJson: $("exportJson"),
+  importJsonFile: $("importJsonFile"),
+  importJsonText: $("importJsonText"),
+  importJsonTextBtn: $("importJsonTextBtn"),
+  settingsError: $("settingsError"),
   clearAll: $("clearAll"),
+  largeTextToggle: $("largeTextToggle"),
 
   growthTpl: $("growthItemTpl"),
   diaryTpl: $("diaryItemTpl"),
+
+  onboardingModal: $("onboardingModal"),
+  onboardingStepNow: $("onboardingStepNow"),
+  onboardingPrev: $("onboardingPrev"),
+  onboardingNext: $("onboardingNext"),
+  onboardingClose: $("onboardingClose"),
+  onboardingSteps: [$("onboardingStep1"), $("onboardingStep2"), $("onboardingStep3")],
 };
+
+let onboardingStepIndex = 0;
+let saveStatusTimer = null;
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function setAppError(msg = "") {
+  if (!msg) {
+    els.appError.textContent = "";
+    els.appError.classList.remove("show");
+    return;
+  }
+  els.appError.textContent = msg;
+  els.appError.classList.add("show");
+}
+
+function setSaveStatus(status, text) {
+  if (!els.saveStatus) return;
+  els.saveStatus.className = `save-status ${status}`;
+  els.saveStatus.textContent = text;
+}
+
+function queueIdleStatus() {
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => setSaveStatus("idle", "保存準備完了"), 1300);
+}
+
+function snapshot() {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    profile: state.profile,
+    growthRecords: state.growthRecords,
+    diaries: state.diaries,
+    ui: state.ui,
+  };
+}
+
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  setSaveStatus("saving", "保存中...");
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot()));
+    setAppError("");
+    setSaveStatus("success", "保存済み");
+    queueIdleStatus();
+    return true;
+  } catch (e) {
+    console.error("保存失敗", e);
+    setAppError("保存に失敗しました。画像サイズやブラウザ容量を確認してください。");
+    setSaveStatus("error", "保存エラー");
+    return false;
+  }
+}
+
+function applyData(parsed) {
+  state.schemaVersion = Number.isInteger(parsed.schemaVersion) ? parsed.schemaVersion : SCHEMA_VERSION;
+  state.profile = parsed.profile || null;
+  state.growthRecords = Array.isArray(parsed.growthRecords) ? parsed.growthRecords : [];
+  state.diaries = Array.isArray(parsed.diaries) ? parsed.diaries : [];
+  const ui = parsed.ui || {};
+  state.ui = {
+    continuousGrowthInput: Boolean(ui.continuousGrowthInput),
+    largeText: Boolean(ui.largeText),
+  };
 }
 
 function load() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return;
   try {
-    const parsed = JSON.parse(raw);
-    state.profile = parsed.profile || null;
-    state.growthRecords = Array.isArray(parsed.growthRecords) ? parsed.growthRecords : [];
-    state.diaries = Array.isArray(parsed.diaries) ? parsed.diaries : [];
+    applyData(JSON.parse(raw));
   } catch (e) {
     console.warn("データ読込失敗", e);
+    setAppError("保存データの読み込みに失敗しました。設定からJSONインポートで復旧できます。");
+    setSaveStatus("error", "保存データ読込エラー");
   }
 }
 
@@ -101,10 +187,29 @@ function isFutureDate(dateStr) {
   return d > today;
 }
 
+function switchTab(tabName) {
+  els.tabButtons.forEach((btn) => {
+    const active = btn.dataset.tab === tabName;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+    btn.setAttribute("tabindex", active ? "0" : "-1");
+  });
+  els.tabPanels.forEach((panel) => panel.classList.toggle("active", panel.id === `tab-${tabName}`));
+  if (els.srAnnouncer) els.srAnnouncer.textContent = `${tabName}タブを表示`;
+}
+
 function renderProfile() {
   const p = state.profile;
   if (!p) {
-    els.profileView.innerHTML = `<p class="empty">未登録です。まずはプロフィールを保存してください。</p>`;
+    els.profileView.innerHTML = `
+      <div class="empty-guide">
+        <strong>まだプロフィールが未登録です。</strong>
+        <ul>
+          <li>名前と生年月日を入力して保存</li>
+          <li>登録後は現在の年齢が自動表示されます</li>
+        </ul>
+      </div>
+    `;
     return;
   }
   els.profileView.innerHTML = `
@@ -118,7 +223,19 @@ function renderGrowthList() {
   els.growthList.innerHTML = "";
   const sorted = [...state.growthRecords].sort((a, b) => b.date.localeCompare(a.date));
   if (!sorted.length) {
-    els.growthList.innerHTML = `<p class="empty">記録がまだありません。最初の身長・体重を登録してみましょう。</p>`;
+    els.growthList.innerHTML = `
+      <div class="empty-guide">
+        <strong>記録がまだありません。</strong>
+        <ul>
+          <li>日付・身長・体重を入力して「記録を追加」</li>
+          <li>連続入力モードをONにすると兄弟分の連続登録にも便利</li>
+          <li>2件以上保存するとグラフに線が表示されます</li>
+        </ul>
+        <div class="inline-actions">
+          <button type="button" class="jump-tab" data-go-tab="graph">グラフを見る</button>
+        </div>
+      </div>
+    `;
     return;
   }
   for (const rec of sorted) {
@@ -139,7 +256,19 @@ function renderDiaryList() {
   els.diaryList.innerHTML = "";
   const sorted = [...state.diaries].sort((a, b) => b.date.localeCompare(a.date));
   if (!sorted.length) {
-    els.diaryList.innerHTML = `<p class="empty">日記がまだありません。写真付きで今日の思い出を残してみましょう。</p>`;
+    els.diaryList.innerHTML = `
+      <div class="empty-guide">
+        <strong>日記がまだありません。</strong>
+        <ul>
+          <li>タイトルと内容を入力して保存</li>
+          <li>写真を添付すると後で見返しやすくなります</li>
+          <li>設定タブでJSONバックアップしておくと安心です</li>
+        </ul>
+        <div class="inline-actions">
+          <button type="button" class="jump-tab" data-go-tab="settings">バックアップ設定へ</button>
+        </div>
+      </div>
+    `;
     return;
   }
   for (const diary of sorted) {
@@ -258,6 +387,9 @@ function renderAll() {
   renderGrowthList();
   renderDiaryList();
   drawChart();
+  els.continuousGrowthMode.checked = state.ui.continuousGrowthInput;
+  if (els.largeTextToggle) els.largeTextToggle.checked = state.ui.largeText;
+  document.body.classList.toggle("large-text", state.ui.largeText);
 }
 
 function fileToDataUrl(file) {
@@ -309,7 +441,100 @@ function validateDiary(file) {
   return "";
 }
 
+function validateImportObject(parsed) {
+  if (!parsed || typeof parsed !== "object") throw new Error("JSONがオブジェクトではありません。");
+
+  const hasLegacyShape = parsed.profile !== undefined || parsed.growthRecords !== undefined || parsed.diaries !== undefined;
+  if (!hasLegacyShape) throw new Error("必要なデータ項目が見つかりません。");
+
+  if (parsed.schemaVersion !== undefined && !Number.isInteger(parsed.schemaVersion)) {
+    throw new Error("schemaVersion が不正です。");
+  }
+  if (parsed.growthRecords !== undefined && !Array.isArray(parsed.growthRecords)) {
+    throw new Error("growthRecords は配列である必要があります。");
+  }
+  if (parsed.diaries !== undefined && !Array.isArray(parsed.diaries)) {
+    throw new Error("diaries は配列である必要があります。");
+  }
+}
+
+function exportJson() {
+  try {
+    const blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `sukusuku-note-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setError(els.settingsError, "");
+  } catch (e) {
+    console.error("エクスポート失敗", e);
+    setError(els.settingsError, "エクスポートに失敗しました。");
+  }
+}
+
+function importJsonString(jsonText) {
+  try {
+    const parsed = JSON.parse(jsonText);
+    validateImportObject(parsed);
+    applyData(parsed);
+    if (!save()) throw new Error("保存に失敗しました。");
+    renderAll();
+    setError(els.settingsError, "インポートが完了しました。");
+  } catch (e) {
+    console.error("インポート失敗", e);
+    setError(els.settingsError, `インポートに失敗しました: ${e.message}`);
+  }
+}
+
+function renderOnboardingStep() {
+  const step = onboardingStepIndex + 1;
+  els.onboardingStepNow.textContent = String(step);
+  els.onboardingSteps.forEach((el, idx) => el.classList.toggle("active", idx === onboardingStepIndex));
+  els.onboardingPrev.disabled = onboardingStepIndex === 0;
+  els.onboardingNext.style.display = onboardingStepIndex >= 2 ? "none" : "inline-block";
+  els.onboardingClose.style.display = onboardingStepIndex >= 2 ? "inline-block" : "none";
+}
+
+function closeOnboarding() {
+  localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+  els.onboardingModal.hidden = true;
+}
+
+function maybeShowOnboarding() {
+  const seen = localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
+  if (seen) return;
+  onboardingStepIndex = 0;
+  renderOnboardingStep();
+  els.onboardingModal.hidden = false;
+}
+
 function setupEvents() {
+  els.tabButtons.forEach((btn, idx) => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    btn.addEventListener("keydown", (e) => {
+      if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+      e.preventDefault();
+      let next = idx;
+      if (e.key === "ArrowRight") next = (idx + 1) % els.tabButtons.length;
+      if (e.key === "ArrowLeft") next = (idx - 1 + els.tabButtons.length) % els.tabButtons.length;
+      if (e.key === "Home") next = 0;
+      if (e.key === "End") next = els.tabButtons.length - 1;
+      const nextBtn = els.tabButtons[next];
+      switchTab(nextBtn.dataset.tab);
+      nextBtn.focus();
+    });
+  });
+
+  document.body.addEventListener("click", (e) => {
+    const trigger = e.target.closest(".jump-tab");
+    if (!trigger) return;
+    const tab = trigger.dataset.goTab;
+    if (tab) switchTab(tab);
+  });
+
   els.profileForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const err = validateProfile();
@@ -321,7 +546,7 @@ function setupEvents() {
       birthDate: els.birthDate.value,
       note: els.profileNote.value.trim(),
     };
-    save();
+    if (!save()) return;
     renderProfile();
   });
 
@@ -338,11 +563,29 @@ function setupEvents() {
       weight: Number(els.weight.value),
       memo: els.growthMemo.value.trim(),
     });
-    save();
-    els.growthForm.reset();
-    els.recordDate.valueAsDate = new Date();
+    if (!save()) return;
+
+    if (!state.ui.continuousGrowthInput) {
+      els.growthForm.reset();
+      els.recordDate.valueAsDate = new Date();
+      els.continuousGrowthMode.checked = false;
+    }
+
     renderAll();
   });
+
+  els.continuousGrowthMode.addEventListener("change", () => {
+    state.ui.continuousGrowthInput = els.continuousGrowthMode.checked;
+    save();
+  });
+
+  if (els.largeTextToggle) {
+    els.largeTextToggle.addEventListener("change", () => {
+      state.ui.largeText = els.largeTextToggle.checked;
+      document.body.classList.toggle("large-text", state.ui.largeText);
+      save();
+    });
+  }
 
   els.diaryForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -351,19 +594,23 @@ function setupEvents() {
     setError(els.diaryError, err);
     if (err) return;
 
-    const photoDataUrl = await fileToDataUrl(file);
-
-    state.diaries.push({
-      id: uid(),
-      date: els.diaryDate.value,
-      title: els.diaryTitle.value.trim(),
-      text: els.diaryText.value.trim(),
-      photoDataUrl,
-    });
-    save();
-    els.diaryForm.reset();
-    els.diaryDate.valueAsDate = new Date();
-    renderAll();
+    try {
+      const photoDataUrl = await fileToDataUrl(file);
+      state.diaries.push({
+        id: uid(),
+        date: els.diaryDate.value,
+        title: els.diaryTitle.value.trim(),
+        text: els.diaryText.value.trim(),
+        photoDataUrl,
+      });
+      if (!save()) return;
+      els.diaryForm.reset();
+      els.diaryDate.valueAsDate = new Date();
+      renderAll();
+    } catch (error) {
+      console.error("画像読み込み失敗", error);
+      setError(els.diaryError, "画像の読み込みに失敗しました。別の画像でお試しください。");
+    }
   });
 
   els.clearAll.addEventListener("click", () => {
@@ -376,15 +623,54 @@ function setupEvents() {
     save();
     renderAll();
   });
+
+  els.exportJson.addEventListener("click", exportJson);
+
+  els.importJsonFile.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      importJsonString(text);
+    } catch (error) {
+      console.error("ファイル読み込み失敗", error);
+      setError(els.settingsError, "JSONファイルを読み込めませんでした。");
+    } finally {
+      els.importJsonFile.value = "";
+    }
+  });
+
+  els.importJsonTextBtn.addEventListener("click", () => {
+    const jsonText = els.importJsonText.value.trim();
+    if (!jsonText) {
+      setError(els.settingsError, "インポートするJSONテキストを入力してください。");
+      return;
+    }
+    importJsonString(jsonText);
+  });
+
+  els.onboardingPrev.addEventListener("click", () => {
+    onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
+    renderOnboardingStep();
+  });
+
+  els.onboardingNext.addEventListener("click", () => {
+    onboardingStepIndex = Math.min(2, onboardingStepIndex + 1);
+    renderOnboardingStep();
+  });
+
+  els.onboardingClose.addEventListener("click", closeOnboarding);
 }
 
 function initDefaults() {
   const today = new Date();
   els.recordDate.valueAsDate = today;
   els.diaryDate.valueAsDate = today;
+  setSaveStatus("idle", "保存準備完了");
 }
 
 load();
 setupEvents();
 initDefaults();
 renderAll();
+maybeShowOnboarding();

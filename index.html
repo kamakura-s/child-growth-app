@@ -15,85 +15,141 @@
       <p class="subtitle">子どもの成長を、写真・体格・メモでやさしく記録</p>
       <p class="privacy-note">🔒 このアプリのデータはこのブラウザの <strong>localStorage</strong> に保存されます（クラウド送信なし）。</p>
     </div>
-    <div class="hero-pill">MVP / Local First</div>
+    <div class="hero-pill">SPA / Local First</div>
   </header>
 
-  <main class="container grid">
-    <section class="card">
-      <h2>プロフィール登録</h2>
-      <form id="profileForm" class="form" novalidate>
-        <label>お名前 <span class="req">*</span>
-          <input type="text" id="childName" maxlength="30" required placeholder="例: はな" />
-        </label>
-        <label>生年月日 <span class="req">*</span>
-          <input type="date" id="birthDate" required />
-        </label>
-        <label>メモ
-          <textarea id="profileNote" rows="2" maxlength="120" placeholder="好きな食べ物など"></textarea>
-        </label>
-        <p class="error" id="profileError"></p>
-        <button type="submit">プロフィールを保存</button>
-      </form>
-      <div id="profileView" class="profile-view"></div>
+  <main class="container app-shell">
+    <nav class="tabs" aria-label="アプリメニュー" role="tablist">
+      <button id="tab-btn-profile" type="button" class="tab-btn active" data-tab="profile" role="tab" aria-selected="true" aria-controls="tab-profile" tabindex="0">プロフィール</button>
+      <button id="tab-btn-growth" type="button" class="tab-btn" data-tab="growth" role="tab" aria-selected="false" aria-controls="tab-growth" tabindex="-1">成長記録</button>
+      <button id="tab-btn-diary" type="button" class="tab-btn" data-tab="diary" role="tab" aria-selected="false" aria-controls="tab-diary" tabindex="-1">日記</button>
+      <button id="tab-btn-graph" type="button" class="tab-btn" data-tab="graph" role="tab" aria-selected="false" aria-controls="tab-graph" tabindex="-1">グラフ</button>
+      <button id="tab-btn-settings" type="button" class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings" tabindex="-1">設定</button>
+    </nav>
+
+    <p id="appError" class="error app-error" role="alert"></p>
+    <p id="srAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></p>
+    <p id="saveStatus" class="save-status idle" aria-live="polite">保存準備完了</p>
+
+    <section id="tab-profile" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-profile">
+      <article class="card">
+        <h2>プロフィール登録</h2>
+        <form id="profileForm" class="form" novalidate>
+          <label>お名前 <span class="req">*</span>
+            <input type="text" id="childName" maxlength="30" required placeholder="例: はな" />
+          </label>
+          <label>生年月日 <span class="req">*</span>
+            <input type="date" id="birthDate" required />
+          </label>
+          <label>メモ
+            <textarea id="profileNote" rows="2" maxlength="120" placeholder="好きな食べ物など"></textarea>
+          </label>
+          <p class="error" id="profileError"></p>
+          <button type="submit">プロフィールを保存</button>
+        </form>
+        <div id="profileView" class="profile-view"></div>
+      </article>
     </section>
 
-    <section class="card">
-      <h2>身長・体重の記録</h2>
-      <form id="growthForm" class="form two-col" novalidate>
-        <label>日付 <span class="req">*</span>
-          <input type="date" id="recordDate" required />
-        </label>
-        <label>身長 (cm) <span class="req">*</span>
-          <input type="number" id="height" min="30" max="220" step="0.1" required placeholder="例: 92.4" />
-        </label>
-        <label>体重 (kg) <span class="req">*</span>
-          <input type="number" id="weight" min="1" max="120" step="0.1" required placeholder="例: 13.6" />
-        </label>
-        <label>メモ
-          <input type="text" id="growthMemo" maxlength="80" placeholder="体調や出来事" />
-        </label>
-        <p class="error full" id="growthError"></p>
-        <button type="submit" class="full">記録を追加</button>
-      </form>
+    <section id="tab-growth" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-growth">
+      <article class="card">
+        <h2>身長・体重の記録</h2>
+        <form id="growthForm" class="form two-col" novalidate>
+          <label>日付 <span class="req">*</span>
+            <input type="date" id="recordDate" required />
+          </label>
+          <label>身長 (cm) <span class="req">*</span>
+            <input type="number" id="height" min="30" max="220" step="0.1" required placeholder="例: 92.4" />
+          </label>
+          <label>体重 (kg) <span class="req">*</span>
+            <input type="number" id="weight" min="1" max="120" step="0.1" required placeholder="例: 13.6" />
+          </label>
+          <label>メモ
+            <input type="text" id="growthMemo" maxlength="80" placeholder="体調や出来事" />
+          </label>
+          <label class="full inline-toggle">
+            <input type="checkbox" id="continuousGrowthMode" />
+            連続入力モード（保存後にフォームをリセットしない）
+          </label>
+          <p class="error full" id="growthError"></p>
+          <button type="submit" class="full">記録を追加</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>身長・体重 一覧</h3>
+        <div id="growthList" class="list"></div>
+      </article>
     </section>
 
-    <section class="card">
-      <h2>写真付き日記メモ</h2>
-      <form id="diaryForm" class="form" novalidate>
-        <label>日付 <span class="req">*</span>
-          <input type="date" id="diaryDate" required />
-        </label>
-        <label>タイトル <span class="req">*</span>
-          <input type="text" id="diaryTitle" required maxlength="50" placeholder="例: 公園で遊んだ" />
-        </label>
-        <label>内容 <span class="req">*</span>
-          <textarea id="diaryText" rows="3" required maxlength="300"></textarea>
-        </label>
-        <label>写真（任意・最大2MB）
-          <input type="file" id="diaryPhoto" accept="image/png,image/jpeg,image/webp" />
-        </label>
-        <p class="error" id="diaryError"></p>
-        <button type="submit">日記を保存</button>
-      </form>
+    <section id="tab-diary" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-diary">
+      <article class="card">
+        <h2>写真付き日記メモ</h2>
+        <form id="diaryForm" class="form" novalidate>
+          <label>日付 <span class="req">*</span>
+            <input type="date" id="diaryDate" required />
+          </label>
+          <label>タイトル <span class="req">*</span>
+            <input type="text" id="diaryTitle" required maxlength="50" placeholder="例: 公園で遊んだ" />
+          </label>
+          <label>内容 <span class="req">*</span>
+            <textarea id="diaryText" rows="3" required maxlength="300"></textarea>
+          </label>
+          <label>写真（任意・最大2MB）
+            <input type="file" id="diaryPhoto" accept="image/png,image/jpeg,image/webp" />
+          </label>
+          <p class="error" id="diaryError"></p>
+          <button type="submit">日記を保存</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>日記一覧</h3>
+        <div id="diaryList" class="list diary"></div>
+      </article>
     </section>
 
-    <section class="card wide">
-      <h2>成長グラフ（身長 / 体重）</h2>
-      <canvas id="growthChart" width="900" height="320" aria-label="成長グラフ"></canvas>
-      <small>※簡易グラフです。データが2件以上あると線が表示されます。</small>
+    <section id="tab-graph" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-graph">
+      <article class="card">
+        <h2>成長グラフ（身長 / 体重）</h2>
+        <canvas id="growthChart" width="900" height="320" aria-label="成長グラフ"></canvas>
+        <small>※簡易グラフです。データが2件以上あると線が表示されます。</small>
+      </article>
     </section>
 
-    <section class="card wide">
-      <div class="list-head">
-        <h2>記録一覧</h2>
-        <button id="clearAll" class="danger" type="button">全データ削除</button>
-      </div>
+    <section id="tab-settings" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-settings">
+      <article class="card">
+        <h2>設定</h2>
 
-      <h3>身長・体重</h3>
-      <div id="growthList" class="list"></div>
+        <div class="settings-block">
+          <h3>表示</h3>
+          <label class="toggle-label" for="largeTextToggle">
+            <input id="largeTextToggle" type="checkbox" />
+            大きめ文字モード
+          </label>
+          <p class="muted">文字サイズを少し大きくして見やすくします（保存されます）。</p>
+        </div>
 
-      <h3>日記メモ</h3>
-      <div id="diaryList" class="list diary"></div>
+        <div class="settings-block">
+          <h3>データ管理</h3>
+          <p class="muted">データには schemaVersion が付与されます。バックアップとしてJSONを保存できます。</p>
+          <div class="settings-actions">
+            <button id="exportJson" type="button">JSONエクスポート</button>
+            <label class="import-label">
+              JSONインポート
+              <input id="importJsonFile" type="file" accept="application/json,.json" />
+            </label>
+          </div>
+          <textarea id="importJsonText" rows="8" placeholder="ここにJSONを貼り付けて [テキストからインポート] でも復元できます"></textarea>
+          <button id="importJsonTextBtn" type="button">テキストからインポート</button>
+          <p class="error" id="settingsError"></p>
+        </div>
+
+        <div class="settings-block">
+          <h3>危険操作</h3>
+          <button id="clearAll" class="danger" type="button">全データ削除</button>
+        </div>
+      </article>
     </section>
   </main>
 
@@ -118,6 +174,30 @@
       <button class="danger small delete-diary" type="button">削除</button>
     </article>
   </template>
+
+  <div id="onboardingModal" class="onboarding-overlay" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle" hidden>
+    <div class="onboarding-card">
+      <p class="step-indicator"><span id="onboardingStepNow">1</span> / 3</p>
+      <h2 id="onboardingTitle">ようこそ！3ステップで使い方を確認</h2>
+      <div id="onboardingStep1" class="onboarding-step active">
+        <h3>① まずプロフィールを保存</h3>
+        <p>お名前と生年月日を登録すると、年齢表示や記録がわかりやすくなります。</p>
+      </div>
+      <div id="onboardingStep2" class="onboarding-step">
+        <h3>② 成長記録を追加</h3>
+        <p>身長・体重は日付付きで保存。グラフタブで推移を確認できます。</p>
+      </div>
+      <div id="onboardingStep3" class="onboarding-step">
+        <h3>③ 日記とバックアップ</h3>
+        <p>写真付き日記も保存可能。設定タブからJSONバックアップができます。</p>
+      </div>
+      <div class="onboarding-actions">
+        <button type="button" id="onboardingPrev" class="ghost">戻る</button>
+        <button type="button" id="onboardingNext">次へ</button>
+        <button type="button" id="onboardingClose" class="ok">はじめる</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
