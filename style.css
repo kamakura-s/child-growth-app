@@ -155,20 +155,21 @@ h2, h3, h4 { margin-top: 0; }
 label { display: grid; gap: 6px; font-size: .95rem; }
 .req { color: #be123c; font-weight: 600; }
 
-input, textarea, button {
+input, textarea, select, button {
   font: inherit;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
 }
 
-input, textarea {
+input, textarea, select {
   background: var(--input-bg);
   color: var(--text);
 }
 
 input:focus-visible,
 textarea:focus-visible,
+select:focus-visible,
 button:focus-visible,
 .tab-btn:focus-visible,
 .import-label:focus-within {
@@ -178,7 +179,8 @@ button:focus-visible,
 }
 
 input:focus-visible,
-textarea:focus-visible { border-color: #818cf8; }
+textarea:focus-visible,
+select:focus-visible { border-color: #818cf8; }
 
 button {
   cursor: pointer;
@@ -253,6 +255,46 @@ button.small { padding: 7px 10px; font-size: .85rem; min-height: auto; }
   margin-top: 8px;
   border: 1px solid var(--border);
 }
+
+.chips {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: .78rem;
+  border: 1px solid var(--tab-border);
+  background: var(--secondary-bg);
+  color: var(--secondary-text);
+}
+
+.category-chip {
+  background: rgba(79, 70, 229, .12);
+  border-color: rgba(79, 70, 229, .35);
+}
+
+.report-box {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--input-bg);
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.report-grid p { margin: 0; }
 
 canvas {
   width: 100%;

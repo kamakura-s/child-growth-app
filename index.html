@@ -58,11 +58,23 @@
           <label>日付 <span class="req">*</span>
             <input type="date" id="recordDate" required />
           </label>
+          <label>カテゴリ
+            <select id="growthCategory">
+              <option value="health">健康</option>
+              <option value="meal">食事</option>
+              <option value="sleep">睡眠</option>
+              <option value="play">遊び</option>
+              <option value="other">その他</option>
+            </select>
+          </label>
           <label>身長 (cm) <span class="req">*</span>
             <input type="number" id="height" min="30" max="220" step="0.1" required placeholder="例: 92.4" />
           </label>
           <label>体重 (kg) <span class="req">*</span>
             <input type="number" id="weight" min="1" max="120" step="0.1" required placeholder="例: 13.6" />
+          </label>
+          <label>タグ（カンマ区切り）
+            <input type="text" id="growthTags" maxlength="120" placeholder="例: 発熱,病院" />
           </label>
           <label>メモ
             <input type="text" id="growthMemo" maxlength="80" placeholder="体調や出来事" />
@@ -73,6 +85,37 @@
           </label>
           <p class="error full" id="growthError"></p>
           <button type="submit" class="full btn btn-primary">記録を追加</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>検索・絞り込み（成長記録）</h3>
+        <form id="growthFilterForm" class="form two-col" novalidate>
+          <label>開始日
+            <input type="date" id="growthFilterFrom" />
+          </label>
+          <label>終了日
+            <input type="date" id="growthFilterTo" />
+          </label>
+          <label>カテゴリ
+            <select id="growthFilterCategory">
+              <option value="">すべて</option>
+              <option value="health">健康</option>
+              <option value="meal">食事</option>
+              <option value="sleep">睡眠</option>
+              <option value="play">遊び</option>
+              <option value="other">その他</option>
+            </select>
+          </label>
+          <label>キーワード
+            <input type="text" id="growthFilterKeyword" placeholder="メモ・タグを検索" />
+          </label>
+          <label class="full">タグ
+            <input type="text" id="growthFilterTag" placeholder="例: 病院" />
+          </label>
+          <div class="full inline-actions">
+            <button type="reset" class="btn btn-secondary">絞り込みをクリア</button>
+          </div>
         </form>
       </article>
 
@@ -92,6 +135,18 @@
           <label>タイトル <span class="req">*</span>
             <input type="text" id="diaryTitle" required maxlength="50" placeholder="例: 公園で遊んだ" />
           </label>
+          <label>カテゴリ
+            <select id="diaryCategory">
+              <option value="event">イベント</option>
+              <option value="health">健康</option>
+              <option value="meal">食事</option>
+              <option value="play">遊び</option>
+              <option value="other">その他</option>
+            </select>
+          </label>
+          <label>タグ（カンマ区切り）
+            <input type="text" id="diaryTags" maxlength="120" placeholder="例: 公園,友だち" />
+          </label>
           <label>内容 <span class="req">*</span>
             <textarea id="diaryText" rows="3" required maxlength="300"></textarea>
           </label>
@@ -100,6 +155,37 @@
           </label>
           <p class="error" id="diaryError"></p>
           <button type="submit" class="btn btn-primary">日記を保存</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>検索・絞り込み（日記）</h3>
+        <form id="diaryFilterForm" class="form two-col" novalidate>
+          <label>開始日
+            <input type="date" id="diaryFilterFrom" />
+          </label>
+          <label>終了日
+            <input type="date" id="diaryFilterTo" />
+          </label>
+          <label>カテゴリ
+            <select id="diaryFilterCategory">
+              <option value="">すべて</option>
+              <option value="event">イベント</option>
+              <option value="health">健康</option>
+              <option value="meal">食事</option>
+              <option value="play">遊び</option>
+              <option value="other">その他</option>
+            </select>
+          </label>
+          <label>キーワード
+            <input type="text" id="diaryFilterKeyword" placeholder="タイトル・本文・タグを検索" />
+          </label>
+          <label class="full">タグ
+            <input type="text" id="diaryFilterTag" placeholder="例: 公園" />
+          </label>
+          <div class="full inline-actions">
+            <button type="reset" class="btn btn-secondary">絞り込みをクリア</button>
+          </div>
         </form>
       </article>
 
@@ -114,6 +200,14 @@
         <h2>成長グラフ（身長 / 体重）</h2>
         <canvas id="growthChart" width="900" height="320" aria-label="成長グラフ"></canvas>
         <small>※簡易グラフです。データが2件以上あると線が表示されます。</small>
+      </article>
+
+      <article class="card">
+        <h2>月次レポート</h2>
+        <label>対象月
+          <input type="month" id="reportMonth" />
+        </label>
+        <div id="monthlyReport" class="report-box"></div>
       </article>
     </section>
 
@@ -176,6 +270,7 @@
       <div>
         <strong class="date"></strong>
         <p class="meta"></p>
+        <div class="chips"></div>
       </div>
       <button class="btn btn-danger small delete-growth" type="button">削除</button>
     </article>
@@ -187,6 +282,7 @@
         <strong class="date"></strong>
         <p class="title"></p>
         <p class="text"></p>
+        <div class="chips"></div>
         <img class="photo" alt="日記写真" />
       </div>
       <button class="btn btn-danger small delete-diary" type="button">削除</button>

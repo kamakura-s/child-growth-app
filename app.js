@@ -1,7 +1,16 @@
 const STORAGE_KEY = "childGrowthMvpData";
 const ONBOARDING_SEEN_KEY = "childGrowthOnboardingSeen";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MAX_IMAGE_MB = 2;
+
+const CATEGORY_LABELS = {
+  health: "健康",
+  meal: "食事",
+  sleep: "睡眠",
+  play: "遊び",
+  event: "イベント",
+  other: "その他",
+};
 
 const state = {
   schemaVersion: SCHEMA_VERSION,
@@ -12,6 +21,10 @@ const state = {
     continuousGrowthInput: false,
     largeText: false,
     theme: "light",
+  },
+  filters: {
+    growth: { from: "", to: "", category: "", keyword: "", tag: "" },
+    diary: { from: "", to: "", category: "", keyword: "", tag: "" },
   },
 };
 
@@ -34,22 +47,42 @@ const els = {
 
   growthForm: $("growthForm"),
   recordDate: $("recordDate"),
+  growthCategory: $("growthCategory"),
   height: $("height"),
   weight: $("weight"),
+  growthTags: $("growthTags"),
   growthMemo: $("growthMemo"),
   continuousGrowthMode: $("continuousGrowthMode"),
   growthList: $("growthList"),
   growthError: $("growthError"),
 
+  growthFilterForm: $("growthFilterForm"),
+  growthFilterFrom: $("growthFilterFrom"),
+  growthFilterTo: $("growthFilterTo"),
+  growthFilterCategory: $("growthFilterCategory"),
+  growthFilterKeyword: $("growthFilterKeyword"),
+  growthFilterTag: $("growthFilterTag"),
+
   diaryForm: $("diaryForm"),
   diaryDate: $("diaryDate"),
   diaryTitle: $("diaryTitle"),
+  diaryCategory: $("diaryCategory"),
+  diaryTags: $("diaryTags"),
   diaryText: $("diaryText"),
   diaryPhoto: $("diaryPhoto"),
   diaryList: $("diaryList"),
   diaryError: $("diaryError"),
 
+  diaryFilterForm: $("diaryFilterForm"),
+  diaryFilterFrom: $("diaryFilterFrom"),
+  diaryFilterTo: $("diaryFilterTo"),
+  diaryFilterCategory: $("diaryFilterCategory"),
+  diaryFilterKeyword: $("diaryFilterKeyword"),
+  diaryFilterTag: $("diaryFilterTag"),
+
   chart: $("growthChart"),
+  reportMonth: $("reportMonth"),
+  monthlyReport: $("monthlyReport"),
 
   exportJson: $("exportJson"),
   importJsonFile: $("importJsonFile"),
@@ -76,6 +109,20 @@ let saveStatusTimer = null;
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function toTags(input) {
+  if (!input) return [];
+  const arr = String(input)
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((v) => v.slice(0, 20).toLowerCase());
+  return [...new Set(arr)].slice(0, 8);
+}
+
+function normalizeCategory(value, fallback = "other") {
+  return CATEGORY_LABELS[value] ? value : fallback;
 }
 
 function setAppError(msg = "") {
@@ -125,11 +172,35 @@ function save() {
   }
 }
 
+function migrateGrowthRecord(rec) {
+  return {
+    id: rec.id || uid(),
+    date: rec.date || "",
+    height: Number(rec.height),
+    weight: Number(rec.weight),
+    memo: rec.memo || "",
+    category: normalizeCategory(rec.category, "health"),
+    tags: Array.isArray(rec.tags) ? toTags(rec.tags.join(",")) : [],
+  };
+}
+
+function migrateDiary(diary) {
+  return {
+    id: diary.id || uid(),
+    date: diary.date || "",
+    title: diary.title || "",
+    text: diary.text || "",
+    photoDataUrl: diary.photoDataUrl || "",
+    category: normalizeCategory(diary.category, "event"),
+    tags: Array.isArray(diary.tags) ? toTags(diary.tags.join(",")) : [],
+  };
+}
+
 function applyData(parsed) {
   state.schemaVersion = Number.isInteger(parsed.schemaVersion) ? parsed.schemaVersion : SCHEMA_VERSION;
   state.profile = parsed.profile || null;
-  state.growthRecords = Array.isArray(parsed.growthRecords) ? parsed.growthRecords : [];
-  state.diaries = Array.isArray(parsed.diaries) ? parsed.diaries : [];
+  state.growthRecords = Array.isArray(parsed.growthRecords) ? parsed.growthRecords.map(migrateGrowthRecord) : [];
+  state.diaries = Array.isArray(parsed.diaries) ? parsed.diaries.map(migrateDiary) : [];
   const ui = parsed.ui || {};
   state.ui = {
     continuousGrowthInput: Boolean(ui.continuousGrowthInput),
@@ -222,29 +293,57 @@ function renderProfile() {
   `;
 }
 
+function chipsHtml(category, tags = []) {
+  const tagHtml = tags.map((tag) => `<span class="chip">#${escapeHtml(tag)}</span>`).join("");
+  return `<span class="chip category-chip">${escapeHtml(CATEGORY_LABELS[category] || "その他")}</span>${tagHtml}`;
+}
+
+function inDateRange(date, from, to) {
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+  return true;
+}
+
+function filterGrowthRecords(records) {
+  const f = state.filters.growth;
+  return records.filter((r) => {
+    if (!inDateRange(r.date, f.from, f.to)) return false;
+    if (f.category && r.category !== f.category) return false;
+    if (f.tag && !r.tags.some((t) => t.includes(f.tag.toLowerCase()))) return false;
+    if (f.keyword) {
+      const hay = `${r.memo} ${r.tags.join(" ")} ${CATEGORY_LABELS[r.category] || ""}`.toLowerCase();
+      if (!hay.includes(f.keyword.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function filterDiaries(diaries) {
+  const f = state.filters.diary;
+  return diaries.filter((d) => {
+    if (!inDateRange(d.date, f.from, f.to)) return false;
+    if (f.category && d.category !== f.category) return false;
+    if (f.tag && !d.tags.some((t) => t.includes(f.tag.toLowerCase()))) return false;
+    if (f.keyword) {
+      const hay = `${d.title} ${d.text} ${d.tags.join(" ")} ${CATEGORY_LABELS[d.category] || ""}`.toLowerCase();
+      if (!hay.includes(f.keyword.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
 function renderGrowthList() {
   els.growthList.innerHTML = "";
-  const sorted = [...state.growthRecords].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = filterGrowthRecords([...state.growthRecords]).sort((a, b) => b.date.localeCompare(a.date));
   if (!sorted.length) {
-    els.growthList.innerHTML = `
-      <div class="empty-guide">
-        <strong>記録がまだありません。</strong>
-        <ul>
-          <li>日付・身長・体重を入力して「記録を追加」</li>
-          <li>連続入力モードをONにすると兄弟分の連続登録にも便利</li>
-          <li>2件以上保存するとグラフに線が表示されます</li>
-        </ul>
-        <div class="inline-actions">
-          <button type="button" class="jump-tab" data-go-tab="graph">グラフを見る</button>
-        </div>
-      </div>
-    `;
+    els.growthList.innerHTML = `<div class="empty-guide"><strong>条件に一致する記録がありません。</strong></div>`;
     return;
   }
   for (const rec of sorted) {
     const node = els.growthTpl.content.firstElementChild.cloneNode(true);
     node.querySelector(".date").textContent = formatDate(rec.date);
     node.querySelector(".meta").textContent = `身長 ${rec.height} cm / 体重 ${rec.weight} kg${rec.memo ? ` / ${rec.memo}` : ""}`;
+    node.querySelector(".chips").innerHTML = chipsHtml(rec.category, rec.tags);
     node.querySelector(".delete-growth").addEventListener("click", () => {
       if (!confirm("この記録を削除しますか？")) return;
       state.growthRecords = state.growthRecords.filter((r) => r.id !== rec.id);
@@ -257,21 +356,9 @@ function renderGrowthList() {
 
 function renderDiaryList() {
   els.diaryList.innerHTML = "";
-  const sorted = [...state.diaries].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = filterDiaries([...state.diaries]).sort((a, b) => b.date.localeCompare(a.date));
   if (!sorted.length) {
-    els.diaryList.innerHTML = `
-      <div class="empty-guide">
-        <strong>日記がまだありません。</strong>
-        <ul>
-          <li>タイトルと内容を入力して保存</li>
-          <li>写真を添付すると後で見返しやすくなります</li>
-          <li>設定タブでJSONバックアップしておくと安心です</li>
-        </ul>
-        <div class="inline-actions">
-          <button type="button" class="jump-tab" data-go-tab="settings">バックアップ設定へ</button>
-        </div>
-      </div>
-    `;
+    els.diaryList.innerHTML = `<div class="empty-guide"><strong>条件に一致する日記がありません。</strong></div>`;
     return;
   }
   for (const diary of sorted) {
@@ -279,6 +366,7 @@ function renderDiaryList() {
     node.querySelector(".date").textContent = formatDate(diary.date);
     node.querySelector(".title").textContent = diary.title;
     node.querySelector(".text").textContent = diary.text;
+    node.querySelector(".chips").innerHTML = chipsHtml(diary.category, diary.tags);
     const img = node.querySelector(".photo");
     if (diary.photoDataUrl) {
       img.src = diary.photoDataUrl;
@@ -390,6 +478,47 @@ function drawChart() {
   });
 }
 
+function renderMonthlyReport() {
+  const month = els.reportMonth.value;
+  if (!month) {
+    els.monthlyReport.innerHTML = "<p class='muted'>対象月を選ぶと自動集計されます。</p>";
+    return;
+  }
+  const [y, m] = month.split("-");
+  const prefix = `${y}-${m}`;
+
+  const growth = state.growthRecords.filter((r) => r.date.startsWith(prefix));
+  const diaries = state.diaries.filter((d) => d.date.startsWith(prefix));
+
+  const avgHeight = growth.length
+    ? (growth.reduce((sum, r) => sum + Number(r.height || 0), 0) / growth.length).toFixed(1)
+    : "-";
+  const avgWeight = growth.length
+    ? (growth.reduce((sum, r) => sum + Number(r.weight || 0), 0) / growth.length).toFixed(1)
+    : "-";
+
+  const highlights = [...growth.map((r) => ({ date: r.date, text: `成長: ${r.memo || "記録追加"}` })), ...diaries.map((d) => ({ date: d.date, text: `日記: ${d.title}` }))]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+
+  els.monthlyReport.innerHTML = `
+    <div class="report-grid">
+      <p><strong>成長記録件数:</strong> ${growth.length}件</p>
+      <p><strong>日記件数:</strong> ${diaries.length}件</p>
+      <p><strong>平均身長:</strong> ${avgHeight === "-" ? "-" : `${avgHeight} cm`}</p>
+      <p><strong>平均体重:</strong> ${avgWeight === "-" ? "-" : `${avgWeight} kg`}</p>
+    </div>
+    <div>
+      <strong>最近のハイライト</strong>
+      ${
+        highlights.length
+          ? `<ul>${highlights.map((h) => `<li>${formatDate(h.date)} - ${escapeHtml(h.text)}</li>`).join("")}</ul>`
+          : "<p class='muted'>この月のハイライトはまだありません。</p>"
+      }
+    </div>
+  `;
+}
+
 function applyTheme() {
   const theme = state.ui.theme === "dark" ? "dark" : "light";
   document.body.dataset.theme = theme;
@@ -401,6 +530,7 @@ function renderAll() {
   renderGrowthList();
   renderDiaryList();
   drawChart();
+  renderMonthlyReport();
   els.continuousGrowthMode.checked = state.ui.continuousGrowthInput;
   if (els.largeTextToggle) els.largeTextToggle.checked = state.ui.largeText;
   document.body.classList.toggle("large-text", state.ui.largeText);
@@ -532,6 +662,48 @@ function maybeShowOnboarding() {
   els.onboardingModal.style.display = "grid";
 }
 
+function setupFilterEvents() {
+  const bindGrowth = () => {
+    state.filters.growth = {
+      from: els.growthFilterFrom.value,
+      to: els.growthFilterTo.value,
+      category: els.growthFilterCategory.value,
+      keyword: els.growthFilterKeyword.value.trim(),
+      tag: els.growthFilterTag.value.trim().toLowerCase(),
+    };
+    renderGrowthList();
+  };
+  [els.growthFilterFrom, els.growthFilterTo, els.growthFilterCategory, els.growthFilterKeyword, els.growthFilterTag].forEach((el) =>
+    el.addEventListener("input", bindGrowth)
+  );
+  els.growthFilterForm.addEventListener("reset", () => {
+    setTimeout(() => {
+      state.filters.growth = { from: "", to: "", category: "", keyword: "", tag: "" };
+      renderGrowthList();
+    }, 0);
+  });
+
+  const bindDiary = () => {
+    state.filters.diary = {
+      from: els.diaryFilterFrom.value,
+      to: els.diaryFilterTo.value,
+      category: els.diaryFilterCategory.value,
+      keyword: els.diaryFilterKeyword.value.trim(),
+      tag: els.diaryFilterTag.value.trim().toLowerCase(),
+    };
+    renderDiaryList();
+  };
+  [els.diaryFilterFrom, els.diaryFilterTo, els.diaryFilterCategory, els.diaryFilterKeyword, els.diaryFilterTag].forEach((el) =>
+    el.addEventListener("input", bindDiary)
+  );
+  els.diaryFilterForm.addEventListener("reset", () => {
+    setTimeout(() => {
+      state.filters.diary = { from: "", to: "", category: "", keyword: "", tag: "" };
+      renderDiaryList();
+    }, 0);
+  });
+}
+
 function setupEvents() {
   els.tabButtons.forEach((btn, idx) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -580,8 +752,10 @@ function setupEvents() {
     state.growthRecords.push({
       id: uid(),
       date: els.recordDate.value,
+      category: normalizeCategory(els.growthCategory.value, "health"),
       height: Number(els.height.value),
       weight: Number(els.weight.value),
+      tags: toTags(els.growthTags.value),
       memo: els.growthMemo.value.trim(),
     });
     if (!save()) return;
@@ -590,6 +764,7 @@ function setupEvents() {
       els.growthForm.reset();
       els.recordDate.valueAsDate = new Date();
       els.continuousGrowthMode.checked = false;
+      els.growthCategory.value = "health";
     }
 
     renderAll();
@@ -629,12 +804,15 @@ function setupEvents() {
         id: uid(),
         date: els.diaryDate.value,
         title: els.diaryTitle.value.trim(),
+        category: normalizeCategory(els.diaryCategory.value, "event"),
+        tags: toTags(els.diaryTags.value),
         text: els.diaryText.value.trim(),
         photoDataUrl,
       });
       if (!save()) return;
       els.diaryForm.reset();
       els.diaryDate.valueAsDate = new Date();
+      els.diaryCategory.value = "event";
       renderAll();
     } catch (error) {
       console.error("画像読み込み失敗", error);
@@ -678,6 +856,10 @@ function setupEvents() {
     importJsonString(jsonText);
   });
 
+  if (els.reportMonth) {
+    els.reportMonth.addEventListener("input", renderMonthlyReport);
+  }
+
   els.onboardingPrev.addEventListener("click", () => {
     onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
     renderOnboardingStep();
@@ -689,12 +871,19 @@ function setupEvents() {
   });
 
   els.onboardingClose.addEventListener("click", closeOnboarding);
+
+  setupFilterEvents();
 }
 
 function initDefaults() {
   const today = new Date();
   els.recordDate.valueAsDate = today;
   els.diaryDate.valueAsDate = today;
+  if (els.growthCategory) els.growthCategory.value = "health";
+  if (els.diaryCategory) els.diaryCategory.value = "event";
+  if (els.reportMonth) {
+    els.reportMonth.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  }
   setSaveStatus("idle", "保存準備完了");
 }
 
