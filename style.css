@@ -525,6 +525,77 @@ canvas {
   border: 0;
 }
 
+/* 編集中ハイライト */
+.item.editing {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, .25);
+}
+
+/* アイテムアクションボタン */
+.item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* フォーム送信行 */
+.form-submit-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.form-submit-row .btn-primary { flex: 1; }
+
+/* フィルター折りたたみ */
+.filter-card { padding: 0; overflow: hidden; }
+.filter-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.filter-toggle:hover { background: rgba(99, 102, 241, .06); }
+.filter-toggle-icon { font-size: .75rem; color: var(--muted); transition: transform .2s; }
+.filter-toggle[aria-expanded="true"] .filter-toggle-icon { transform: rotate(180deg); }
+.filter-body { padding: 0 18px 16px; }
+
+/* 写真プレビュー */
+.photo-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+}
+.photo-preview img {
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+/* 文字数カウンター */
+.char-count {
+  font-size: .82rem;
+  color: var(--muted);
+  text-align: right;
+}
+.char-count.char-count-warn { color: #be123c; font-weight: 600; }
+
 @media (max-width: 860px) {
   .hero { display: block; }
   .form.two-col { grid-template-columns: 1fr; }
@@ -537,9 +608,11 @@ canvas {
   .container { width: min(100%, 94vw); }
   .card { padding: 14px; }
   .item { flex-direction: column; }
-  .item .btn.small { align-self: flex-end; }
+  .item-actions { flex-direction: row; align-self: flex-end; }
   .tabs { position: sticky; top: 0; z-index: 5; padding: 8px 0; background: var(--card); backdrop-filter: blur(3px); border-radius: 12px; }
   .tab-btn { flex: 1 1 auto; text-align: center; }
   .onboarding-actions { flex-wrap: wrap; }
   .onboarding-actions .btn { flex: 1; }
+  .form-submit-row { flex-direction: column; }
+  .form-submit-row .btn-primary { flex: none; }
 }
