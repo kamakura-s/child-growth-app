@@ -94,12 +94,19 @@
             連続入力モード（保存後にフォームをリセットしない）
           </label>
           <p class="error full" id="growthError"></p>
-          <button type="submit" class="full btn btn-primary">記録を追加</button>
+          <div class="full form-submit-row">
+            <button type="submit" class="btn btn-primary" id="growthSubmitBtn">記録を追加</button>
+            <button type="button" class="btn btn-secondary" id="growthCancelEdit" style="display:none">キャンセル</button>
+          </div>
         </form>
       </article>
 
-      <article class="card">
-        <h3>検索・絞り込み（成長記録）</h3>
+      <article class="card filter-card">
+        <button type="button" class="filter-toggle" id="growthFilterToggle" aria-expanded="false" aria-controls="growthFilterBody">
+          <span>検索・絞り込み（成長記録）</span>
+          <span class="filter-toggle-icon">▼</span>
+        </button>
+        <div id="growthFilterBody" class="filter-body" hidden>
         <form id="growthFilterForm" class="form two-col" novalidate>
           <label>開始日
             <input type="date" id="growthFilterFrom" />
@@ -127,6 +134,7 @@
             <button type="reset" class="btn btn-secondary">絞り込みをクリア</button>
           </div>
         </form>
+        </div>
       </article>
 
       <article class="card">
@@ -159,18 +167,30 @@
             <div id="diaryTagSuggestions" class="tag-suggestions" aria-label="タグ候補"></div>
           </label>
           <label>内容 <span class="req">*</span>
-            <textarea id="diaryText" rows="3" required maxlength="300"></textarea>
+            <textarea id="diaryText" rows="4" required maxlength="500"></textarea>
+            <span id="diaryTextCount" class="char-count">0 / 500</span>
           </label>
           <label>写真（任意・最大2MB）
             <input type="file" id="diaryPhoto" accept="image/png,image/jpeg,image/webp" />
           </label>
+          <div id="diaryPhotoPreview" class="photo-preview" style="display:none">
+            <img id="diaryPhotoPreviewImg" alt="写真プレビュー" />
+            <button type="button" id="diaryPhotoClear" class="btn btn-secondary small">写真を削除</button>
+          </div>
           <p class="error" id="diaryError"></p>
-          <button type="submit" class="btn btn-primary">日記を保存</button>
+          <div class="form-submit-row">
+            <button type="submit" class="btn btn-primary" id="diarySubmitBtn">日記を保存</button>
+            <button type="button" class="btn btn-secondary" id="diaryCancelEdit" style="display:none">キャンセル</button>
+          </div>
         </form>
       </article>
 
-      <article class="card">
-        <h3>検索・絞り込み（日記）</h3>
+      <article class="card filter-card">
+        <button type="button" class="filter-toggle" id="diaryFilterToggle" aria-expanded="false" aria-controls="diaryFilterBody">
+          <span>検索・絞り込み（日記）</span>
+          <span class="filter-toggle-icon">▼</span>
+        </button>
+        <div id="diaryFilterBody" class="filter-body" hidden>
         <form id="diaryFilterForm" class="form two-col" novalidate>
           <label>開始日
             <input type="date" id="diaryFilterFrom" />
@@ -198,6 +218,7 @@
             <button type="reset" class="btn btn-secondary">絞り込みをクリア</button>
           </div>
         </form>
+        </div>
       </article>
 
       <article class="card">
@@ -305,7 +326,10 @@
         <p class="meta"></p>
         <div class="chips"></div>
       </div>
-      <button class="btn btn-danger small delete-growth" type="button">削除</button>
+      <div class="item-actions">
+        <button class="btn btn-secondary small edit-growth" type="button">編集</button>
+        <button class="btn btn-danger small delete-growth" type="button">削除</button>
+      </div>
     </article>
   </template>
 
@@ -318,7 +342,10 @@
         <div class="chips"></div>
         <img class="photo" alt="日記写真" />
       </div>
-      <button class="btn btn-danger small delete-diary" type="button">削除</button>
+      <div class="item-actions">
+        <button class="btn btn-secondary small edit-diary" type="button">編集</button>
+        <button class="btn btn-danger small delete-diary" type="button">削除</button>
+      </div>
     </article>
   </template>
 

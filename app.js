@@ -69,6 +69,8 @@ const els = {
   continuousGrowthMode: $("continuousGrowthMode"),
   growthList: $("growthList"),
   growthError: $("growthError"),
+  growthSubmitBtn: $("growthSubmitBtn"),
+  growthCancelEdit: $("growthCancelEdit"),
 
   growthFilterForm: $("growthFilterForm"),
   growthFilterFrom: $("growthFilterFrom"),
@@ -76,6 +78,8 @@ const els = {
   growthFilterCategory: $("growthFilterCategory"),
   growthFilterKeyword: $("growthFilterKeyword"),
   growthFilterTag: $("growthFilterTag"),
+  growthFilterToggle: $("growthFilterToggle"),
+  growthFilterBody: $("growthFilterBody"),
 
   diaryForm: $("diaryForm"),
   diaryDate: $("diaryDate"),
@@ -84,9 +88,15 @@ const els = {
   diaryTags: $("diaryTags"),
   diaryTagSuggestions: $("diaryTagSuggestions"),
   diaryText: $("diaryText"),
+  diaryTextCount: $("diaryTextCount"),
   diaryPhoto: $("diaryPhoto"),
+  diaryPhotoPreview: $("diaryPhotoPreview"),
+  diaryPhotoPreviewImg: $("diaryPhotoPreviewImg"),
+  diaryPhotoClear: $("diaryPhotoClear"),
   diaryList: $("diaryList"),
   diaryError: $("diaryError"),
+  diarySubmitBtn: $("diarySubmitBtn"),
+  diaryCancelEdit: $("diaryCancelEdit"),
 
   diaryFilterForm: $("diaryFilterForm"),
   diaryFilterFrom: $("diaryFilterFrom"),
@@ -94,6 +104,8 @@ const els = {
   diaryFilterCategory: $("diaryFilterCategory"),
   diaryFilterKeyword: $("diaryFilterKeyword"),
   diaryFilterTag: $("diaryFilterTag"),
+  diaryFilterToggle: $("diaryFilterToggle"),
+  diaryFilterBody: $("diaryFilterBody"),
 
   chart: $("growthChart"),
   monthlyCountChart: $("monthlyCountChart"),
@@ -124,6 +136,9 @@ const els = {
 
 let onboardingStepIndex = 0;
 let saveStatusTimer = null;
+let editingGrowthId = null;
+let editingDiaryId = null;
+let editingDiaryCurrentPhoto = "";
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -366,6 +381,30 @@ function filterDiaries(diaries) {
   });
 }
 
+function startEditGrowth(rec) {
+  editingGrowthId = rec.id;
+  els.recordDate.value = rec.date;
+  els.growthCategory.value = rec.category;
+  els.height.value = rec.height;
+  els.weight.value = rec.weight;
+  setGrowthConditionValue(rec.condition);
+  els.growthTags.value = rec.tags.join(",");
+  els.growthMemo.value = rec.memo;
+  els.growthSubmitBtn.textContent = "記録を更新";
+  els.growthCancelEdit.style.display = "inline-flex";
+  els.growthForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelEditGrowth() {
+  editingGrowthId = null;
+  els.growthForm.reset();
+  els.recordDate.valueAsDate = new Date();
+  els.growthCategory.value = "health";
+  setGrowthConditionValue("good");
+  els.growthSubmitBtn.textContent = "記録を追加";
+  els.growthCancelEdit.style.display = "none";
+}
+
 function renderGrowthList() {
   els.growthList.innerHTML = "";
   const sorted = filterGrowthRecords([...state.growthRecords]).sort((a, b) => b.date.localeCompare(a.date));
@@ -379,14 +418,51 @@ function renderGrowthList() {
     const cond = CONDITION_LABELS[rec.condition] || CONDITION_LABELS.normal;
     node.querySelector(".meta").textContent = `身長 ${rec.height} cm / 体重 ${rec.weight} kg / 体調 ${cond}${rec.memo ? ` / ${rec.memo}` : ""}`;
     node.querySelector(".chips").innerHTML = chipsHtml(rec.category, rec.tags);
+    if (editingGrowthId === rec.id) node.classList.add("editing");
+    node.querySelector(".edit-growth").addEventListener("click", () => startEditGrowth(rec));
     node.querySelector(".delete-growth").addEventListener("click", () => {
       if (!confirm("この記録を削除しますか？")) return;
+      if (editingGrowthId === rec.id) cancelEditGrowth();
       state.growthRecords = state.growthRecords.filter((r) => r.id !== rec.id);
       save();
       renderAll();
     });
     els.growthList.appendChild(node);
   }
+}
+
+function startEditDiary(diary) {
+  editingDiaryId = diary.id;
+  editingDiaryCurrentPhoto = diary.photoDataUrl || "";
+  els.diaryDate.value = diary.date;
+  els.diaryTitle.value = diary.title;
+  els.diaryCategory.value = diary.category;
+  els.diaryTags.value = diary.tags.join(",");
+  els.diaryText.value = diary.text;
+  updateDiaryTextCount();
+  els.diaryPhoto.value = "";
+  if (diary.photoDataUrl) {
+    els.diaryPhotoPreviewImg.src = diary.photoDataUrl;
+    els.diaryPhotoPreview.style.display = "flex";
+  } else {
+    els.diaryPhotoPreview.style.display = "none";
+  }
+  els.diarySubmitBtn.textContent = "日記を更新";
+  els.diaryCancelEdit.style.display = "inline-flex";
+  els.diaryForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelEditDiary() {
+  editingDiaryId = null;
+  editingDiaryCurrentPhoto = "";
+  els.diaryForm.reset();
+  els.diaryDate.valueAsDate = new Date();
+  els.diaryCategory.value = "event";
+  els.diaryPhotoPreview.style.display = "none";
+  els.diaryPhotoPreviewImg.src = "";
+  els.diarySubmitBtn.textContent = "日記を保存";
+  els.diaryCancelEdit.style.display = "none";
+  updateDiaryTextCount();
 }
 
 function renderDiaryList() {
@@ -409,8 +485,11 @@ function renderDiaryList() {
     } else {
       img.style.display = "none";
     }
+    if (editingDiaryId === diary.id) node.classList.add("editing");
+    node.querySelector(".edit-diary").addEventListener("click", () => startEditDiary(diary));
     node.querySelector(".delete-diary").addEventListener("click", () => {
       if (!confirm("この日記を削除しますか？")) return;
+      if (editingDiaryId === diary.id) cancelEditDiary();
       state.diaries = state.diaries.filter((d) => d.id !== diary.id);
       save();
       renderAll();
@@ -705,6 +784,7 @@ function renderAll() {
   drawCategoryRatioChart();
   renderAnalysisCards();
   renderMonthlyReport();
+  refreshTagSuggestions();
   els.continuousGrowthMode.checked = state.ui.continuousGrowthInput;
   if (els.largeTextToggle) els.largeTextToggle.checked = state.ui.largeText;
   document.body.classList.toggle("large-text", state.ui.largeText);
@@ -894,6 +974,24 @@ function setupTagSuggestions(container, inputEl, tags) {
   });
 }
 
+function refreshTagSuggestions() {
+  const growthUserTags = [...new Set(state.growthRecords.flatMap((r) => r.tags))];
+  const diaryUserTags = [...new Set(state.diaries.flatMap((d) => d.tags))];
+
+  const allGrowthTags = [...new Set([...TAG_SUGGESTIONS.growth, ...growthUserTags])];
+  const allDiaryTags = [...new Set([...TAG_SUGGESTIONS.diary, ...diaryUserTags])];
+
+  setupTagSuggestions(els.growthTagSuggestions, els.growthTags, allGrowthTags);
+  setupTagSuggestions(els.diaryTagSuggestions, els.diaryTags, allDiaryTags);
+}
+
+function updateDiaryTextCount() {
+  const len = els.diaryText.value.length;
+  const max = Number(els.diaryText.getAttribute("maxlength")) || 500;
+  els.diaryTextCount.textContent = `${len} / ${max}`;
+  els.diaryTextCount.classList.toggle("char-count-warn", len >= max * 0.9);
+}
+
 function setupEvents() {
   els.tabButtons.forEach((btn, idx) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -939,8 +1037,8 @@ function setupEvents() {
     setError(els.growthError, err);
     if (err) return;
 
-    state.growthRecords.push({
-      id: uid(),
+    const record = {
+      id: editingGrowthId || uid(),
       date: els.recordDate.value,
       category: normalizeCategory(els.growthCategory.value, "health"),
       condition: getGrowthConditionValue(),
@@ -948,19 +1046,28 @@ function setupEvents() {
       weight: Number(els.weight.value),
       tags: toTags(els.growthTags.value),
       memo: els.growthMemo.value.trim(),
-    });
-    if (!save()) return;
+    };
 
-    if (!state.ui.continuousGrowthInput) {
-      els.growthForm.reset();
-      els.recordDate.valueAsDate = new Date();
-      els.continuousGrowthMode.checked = false;
-      els.growthCategory.value = "health";
-      setGrowthConditionValue("good");
+    if (editingGrowthId) {
+      const idx = state.growthRecords.findIndex((r) => r.id === editingGrowthId);
+      if (idx !== -1) state.growthRecords[idx] = record;
+      cancelEditGrowth();
+    } else {
+      state.growthRecords.push(record);
+      if (!state.ui.continuousGrowthInput) {
+        els.growthForm.reset();
+        els.recordDate.valueAsDate = new Date();
+        els.continuousGrowthMode.checked = false;
+        els.growthCategory.value = "health";
+        setGrowthConditionValue("good");
+      }
     }
 
+    if (!save()) return;
     renderAll();
   });
+
+  els.growthCancelEdit.addEventListener("click", cancelEditGrowth);
 
   els.continuousGrowthMode.addEventListener("change", () => {
     state.ui.continuousGrowthInput = els.continuousGrowthMode.checked;
@@ -991,26 +1098,48 @@ function setupEvents() {
     if (err) return;
 
     try {
-      const photoDataUrl = await fileToDataUrl(file);
-      state.diaries.push({
-        id: uid(),
+      let photoDataUrl;
+      if (file) {
+        photoDataUrl = await fileToDataUrl(file);
+      } else if (editingDiaryId) {
+        photoDataUrl = editingDiaryCurrentPhoto;
+      } else {
+        photoDataUrl = "";
+      }
+
+      const entry = {
+        id: editingDiaryId || uid(),
         date: els.diaryDate.value,
         title: els.diaryTitle.value.trim(),
         category: normalizeCategory(els.diaryCategory.value, "event"),
         tags: toTags(els.diaryTags.value),
         text: els.diaryText.value.trim(),
         photoDataUrl,
-      });
+      };
+
+      if (editingDiaryId) {
+        const idx = state.diaries.findIndex((d) => d.id === editingDiaryId);
+        if (idx !== -1) state.diaries[idx] = entry;
+        cancelEditDiary();
+      } else {
+        state.diaries.push(entry);
+        els.diaryForm.reset();
+        els.diaryDate.valueAsDate = new Date();
+        els.diaryCategory.value = "event";
+        els.diaryPhotoPreview.style.display = "none";
+        els.diaryPhotoPreviewImg.src = "";
+        updateDiaryTextCount();
+      }
+
       if (!save()) return;
-      els.diaryForm.reset();
-      els.diaryDate.valueAsDate = new Date();
-      els.diaryCategory.value = "event";
       renderAll();
     } catch (error) {
       console.error("画像読み込み失敗", error);
       setError(els.diaryError, "画像の読み込みに失敗しました。別の画像でお試しください。");
     }
   });
+
+  els.diaryCancelEdit.addEventListener("click", cancelEditDiary);
 
   els.clearAll.addEventListener("click", () => {
     const ok = confirm("全データ（プロフィール・成長記録・日記）を削除します。元に戻せません。よろしいですか？");
@@ -1057,6 +1186,48 @@ function setupEvents() {
 
   setupTagSuggestions(els.growthTagSuggestions, els.growthTags, TAG_SUGGESTIONS.growth);
   setupTagSuggestions(els.diaryTagSuggestions, els.diaryTags, TAG_SUGGESTIONS.diary);
+
+  // 写真プレビュー
+  els.diaryPhoto.addEventListener("change", async () => {
+    const file = els.diaryPhoto.files[0];
+    if (!file) {
+      if (!editingDiaryCurrentPhoto) {
+        els.diaryPhotoPreview.style.display = "none";
+        els.diaryPhotoPreviewImg.src = "";
+      }
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      els.diaryPhotoPreviewImg.src = dataUrl;
+      els.diaryPhotoPreview.style.display = "flex";
+    } catch (err) {
+      console.error("プレビュー失敗", err);
+    }
+  });
+
+  els.diaryPhotoClear.addEventListener("click", () => {
+    els.diaryPhoto.value = "";
+    editingDiaryCurrentPhoto = "";
+    els.diaryPhotoPreview.style.display = "none";
+    els.diaryPhotoPreviewImg.src = "";
+  });
+
+  // 文字数カウンター
+  els.diaryText.addEventListener("input", updateDiaryTextCount);
+
+  // フィルター折りたたみ
+  els.growthFilterToggle.addEventListener("click", () => {
+    const isOpen = !els.growthFilterBody.hidden;
+    els.growthFilterBody.hidden = isOpen;
+    els.growthFilterToggle.setAttribute("aria-expanded", String(!isOpen));
+  });
+
+  els.diaryFilterToggle.addEventListener("click", () => {
+    const isOpen = !els.diaryFilterBody.hidden;
+    els.diaryFilterBody.hidden = isOpen;
+    els.diaryFilterToggle.setAttribute("aria-expanded", String(!isOpen));
+  });
 
   els.onboardingPrev.addEventListener("click", () => {
     onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
